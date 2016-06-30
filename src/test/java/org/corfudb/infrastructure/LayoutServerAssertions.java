@@ -50,7 +50,7 @@ public class LayoutServerAssertions extends AbstractAssert<LayoutServerAssertion
 
         if (actual.phase1Rank.compareTo(phase1Rank) != 0)
         {
-            failWithMessage("Expected server to be in phase1Rank <%d> but it was in phase1Rank <%d>", phase1Rank,
+            failWithMessage("Expected server to be in phase1Rank <%s> but it was in phase1Rank <%s>", phase1Rank,
                     actual.phase1Rank);
         }
 
