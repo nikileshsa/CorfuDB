@@ -116,7 +116,7 @@ public class LayoutViewTest extends AbstractViewTest {
     }
 
     @Test
-    public void layoutPastProposalAdopted()
+    public void layoutPastProposalAdoptedNoQuorum()
             throws Exception {
         // No Bootstrap Option Map
         Map<String, Object> noBootstrap = new ImmutableMap.Builder<String,Object>()
@@ -128,8 +128,9 @@ public class LayoutViewTest extends AbstractViewTest {
                 .build();
 
         // Server @ 9000 : Layout, Sequencer, LogUnit
-        addServerForTest(getDefaultEndpoint(), new LayoutServer(noBootstrap,
-                getServerRouterForEndpoint(getDefaultEndpoint())));
+        LayoutServer l9000 = new LayoutServer(noBootstrap,
+                getServerRouterForEndpoint(getDefaultEndpoint()));
+        addServerForTest(getDefaultEndpoint(), l9000);
         addServerForTest(getDefaultEndpoint(), new SequencerServer(defaultOptionsMap()));
         addServerForTest(getDefaultEndpoint(), new LogUnitServer(defaultOptionsMap()));
 
@@ -179,13 +180,26 @@ public class LayoutViewTest extends AbstractViewTest {
                 .clientToServerRules.add(new TestClientRule()
                 .matches(x -> x.getMsgType().equals(CorfuMsg.CorfuMsgType.LAYOUT_PROPOSE))
                 .drop());
+
         getTestRouterForEndpoint(getEndpoint(9002))
                 .clientToServerRules.add(new TestClientRule()
                 .matches(x -> x.getMsgType().equals(CorfuMsg.CorfuMsgType.LAYOUT_PROPOSE))
                 .drop());
 
-        r.getLayoutView().prepare(0xDEADBEEF);
+        // Update the layout with our new layout
+        r.getLayoutView().updateLayout(l, 0xDEADBEEF);
 
-        assertThat(l9001).isPhase1Rank(new Rank(0L, null));
+        // Ensure that the propose only reached l9000
+        assertThat(l9000).isInEpoch(2L);
+        assertThat(l9001).isInEpoch(1L);
+        assertThat(l9002).isInEpoch(1L);
+
+        // Prepare with a even higher rank and use a higher epoch for the layout
+        l.getSequencers().add(getEndpoint(9001));
+        r.getLayoutView().updateLayout(l, 0xDFFFFFFF);
+
+        // The layout server should NOT adopt the new proposal, and have
+        // only one sequencer
+        assertThat(l9000).layoutHasSequencerCount(1);
     }
 }
