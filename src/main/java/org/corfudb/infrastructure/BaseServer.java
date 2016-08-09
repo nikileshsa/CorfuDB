@@ -36,7 +36,7 @@ public class BaseServer extends AbstractServer {
      */
     @ServerHandler(type=CorfuMsgType.PING)
     private static void ping(CorfuMsg msg, ChannelHandlerContext ctx, IServerRouter r) {
-        r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsgType.PONG));
+        r.sendResponse(ctx, msg, CorfuMsgType.PONG.msg());
     }
 
     /** Respond to a epoch change message.
@@ -50,12 +50,11 @@ public class BaseServer extends AbstractServer {
         if (csem.getPayload() >= r.getServerEpoch()) {
             log.info("Received SET_EPOCH, moving to new epoch {}", csem.getPayload());
             r.setServerEpoch(csem.getPayload());
-            r.sendResponse(ctx, csem, new CorfuMsg(CorfuMsgType.ACK));
+            r.sendResponse(ctx, csem, CorfuMsgType.ACK.msg());
         } else {
             log.debug("Rejected SET_EPOCH currrent={}, requested={}",
                     r.getServerEpoch(), csem.getPayload());
-            r.sendResponse(ctx, csem, new CorfuPayloadMsg<>(CorfuMsgType.WRONG_EPOCH,
-                    r.getServerEpoch()));
+            r.sendResponse(ctx, csem, CorfuMsgType.WRONG_EPOCH.payloadMsg(r.getServerEpoch()));
         }
     }
 
@@ -82,7 +81,7 @@ public class BaseServer extends AbstractServer {
     @ServerHandler(type=CorfuMsgType.RESET)
     private static void doReset(CorfuMsg msg, ChannelHandlerContext ctx, IServerRouter r) {
         log.warn("Remote reset requested from client " + msg.getClientID());
-        r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsgType.ACK));
+        r.sendResponse(ctx, msg, CorfuMsgType.ACK.msg());
         Utils.sleepUninterruptibly(500); // Sleep, to make sure that all channels are flushed...
         System.exit(100);
     }
