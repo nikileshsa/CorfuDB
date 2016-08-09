@@ -5,7 +5,8 @@ import io.netty.channel.ChannelHandlerContext;
 import io.netty.channel.ChannelInboundHandlerAdapter;
 import lombok.extern.slf4j.Slf4j;
 import org.corfudb.protocols.wireprotocol.CorfuMsg;
-import org.corfudb.protocols.wireprotocol.CorfuSetEpochMsg;
+import org.corfudb.protocols.wireprotocol.CorfuMsgType;
+import org.corfudb.protocols.wireprotocol.CorfuPayloadMsg;
 
 import java.util.Arrays;
 import java.util.Map;
@@ -28,7 +29,7 @@ public class NettyServerRouter extends ChannelInboundHandlerAdapter
     /**
      * This map stores the mapping from message type to netty server handler.
      */
-    Map<CorfuMsg.CorfuMsgType, AbstractServer> handlerMap;
+    Map<CorfuMsgType, AbstractServer> handlerMap;
 
     BaseServer baseServer;
 
@@ -62,7 +63,7 @@ public class NettyServerRouter extends ChannelInboundHandlerAdapter
      */
     public void addServer(AbstractServer server) {
         // Iterate through all types of CorfuMsgType, registering the handler
-        Arrays.<CorfuMsg.CorfuMsgType>stream(CorfuMsg.CorfuMsgType.values())
+        Arrays.<CorfuMsgType>stream(CorfuMsgType.values())
                 .forEach(x -> {
                     if (x.handler.isInstance(server)) {
                         handlerMap.put(x, server);
@@ -96,7 +97,7 @@ public class NettyServerRouter extends ChannelInboundHandlerAdapter
      */
     public boolean validateEpoch(CorfuMsg msg, ChannelHandlerContext ctx) {
         if (!msg.getMsgType().ignoreEpoch && msg.getEpoch() != getServerEpoch()) {
-            sendResponse(ctx, msg, new CorfuSetEpochMsg(CorfuMsg.CorfuMsgType.WRONG_EPOCH,
+            sendResponse(ctx, msg, new CorfuPayloadMsg<>(CorfuMsgType.WRONG_EPOCH,
                     getServerEpoch()));
             log.trace("Incoming message with wrong epoch, got {}, expected {}, message was: {}",
                     msg.getEpoch(), getServerEpoch(), msg);

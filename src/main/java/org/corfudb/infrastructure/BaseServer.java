@@ -5,10 +5,10 @@ import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
 import org.corfudb.protocols.wireprotocol.*;
-import org.corfudb.util.CorfuMsgHandler;
 import org.corfudb.util.Utils;
 
-import java.io.IOException;
+import java.lang.invoke.MethodHandle;
+import java.lang.invoke.MethodHandles;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,10 +26,7 @@ public class BaseServer extends AbstractServer {
     /** Handler for the base server */
     @Getter
     private CorfuMsgHandler handler = new CorfuMsgHandler()
-            .addHandler(CorfuMsg.CorfuMsgType.PING, BaseServer::ping)
-            .addHandler(CorfuMsg.CorfuMsgType.SET_EPOCH, BaseServer::setEpoch)
-            .addHandler(CorfuMsg.CorfuMsgType.RESET, BaseServer::doReset)
-            .addHandler(CorfuMsg.CorfuMsgType.VERSION_REQUEST, this::getVersion);
+            .generateHandlers(MethodHandles.lookup(), this);
 
     /** Respond to a ping message.
      *
@@ -37,8 +34,9 @@ public class BaseServer extends AbstractServer {
      * @param ctx   The channel context
      * @param r     The server router.
      */
+    @ServerHandler(type=CorfuMsgType.PING)
     private static void ping(CorfuMsg msg, ChannelHandlerContext ctx, IServerRouter r) {
-        r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsg.CorfuMsgType.PONG));
+        r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsgType.PONG));
     }
 
     /** Respond to a epoch change message.
@@ -47,15 +45,16 @@ public class BaseServer extends AbstractServer {
      * @param ctx       The channel context
      * @param r         The server router.
      */
+    @ServerHandler(type=CorfuMsgType.SET_EPOCH)
     private static void setEpoch(CorfuPayloadMsg<Long> csem, ChannelHandlerContext ctx, IServerRouter r) {
         if (csem.getPayload() >= r.getServerEpoch()) {
             log.info("Received SET_EPOCH, moving to new epoch {}", csem.getPayload());
             r.setServerEpoch(csem.getPayload());
-            r.sendResponse(ctx, csem, new CorfuMsg(CorfuMsg.CorfuMsgType.ACK));
+            r.sendResponse(ctx, csem, new CorfuMsg(CorfuMsgType.ACK));
         } else {
             log.debug("Rejected SET_EPOCH currrent={}, requested={}",
                     r.getServerEpoch(), csem.getPayload());
-            r.sendResponse(ctx, csem, new CorfuPayloadMsg<>(CorfuMsg.CorfuMsgType.WRONG_EPOCH,
+            r.sendResponse(ctx, csem, new CorfuPayloadMsg<>(CorfuMsgType.WRONG_EPOCH,
                     r.getServerEpoch()));
         }
     }
@@ -66,21 +65,25 @@ public class BaseServer extends AbstractServer {
      * @param ctx   The channel context
      * @param r     The server router.
      */
+    @ServerHandler(type=CorfuMsgType.VERSION_REQUEST)
     private void getVersion(CorfuMsg msg, ChannelHandlerContext ctx, IServerRouter r) {
         VersionInfo vi = new VersionInfo(optionsMap);
-        r.sendResponse(ctx, msg, new JSONPayloadMsg<>(vi, CorfuMsg.CorfuMsgType.VERSION_RESPONSE));
+        r.sendResponse(ctx, msg, new JSONPayloadMsg<>(vi, CorfuMsgType.VERSION_RESPONSE));
     }
 
-    /** Reset the JVM.
+    /** Reset the JVM. This mechanism leverages that corfu_server runs in a bash script
+     * which monitors the exit code of Corfu. If the exit code is 100, then it restarts
+     * the server.
      *
      * @param msg   The incoming message
      * @param ctx   The channel context
      * @param r     The server router.
      */
+    @ServerHandler(type=CorfuMsgType.RESET)
     private static void doReset(CorfuMsg msg, ChannelHandlerContext ctx, IServerRouter r) {
         log.warn("Remote reset requested from client " + msg.getClientID());
-        r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsg.CorfuMsgType.ACK));
-        Utils.sleepUninterruptibly(500);
+        r.sendResponse(ctx, msg, new CorfuMsg(CorfuMsgType.ACK));
+        Utils.sleepUninterruptibly(500); // Sleep, to make sure that all channels are flushed...
         System.exit(100);
     }
 

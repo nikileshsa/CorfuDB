@@ -3,7 +3,7 @@ package org.corfudb.runtime.clients;
 import org.corfudb.AbstractCorfuTest;
 import org.corfudb.infrastructure.BaseServer;
 import org.corfudb.infrastructure.TestServerRouter;
-import org.corfudb.protocols.wireprotocol.CorfuMsg;
+import org.corfudb.protocols.wireprotocol.CorfuMsgType;
 import org.junit.Test;
 
 import java.util.concurrent.TimeoutException;
@@ -48,7 +48,7 @@ public class TestClientRouterTest extends AbstractCorfuTest {
         tcr.addClient(bc);
 
         tcr.rules.add(new TestRule()
-                .matches(x -> x.getMsgType().equals(CorfuMsg.CorfuMsgType.SET_EPOCH))
+                .matches(x -> x.getMsgType().equals(CorfuMsgType.SET_EPOCH))
                 .drop());
 
         assertThat(bc.pingSync())
